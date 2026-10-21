@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Wave Survivor</title>
+<style>
+body{
+    margin:0;
+    background:#111;
+    overflow:hidden;
+    font-family:Arial,sans-serif;
+}
+canvas{
+    display:block;
+}
+#upgradeMenu{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,.8);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    gap:20px;
+}
+.card{
+    width:220px;
+    padding:20px;
+    background:#222;
+    border:2px solid #555;
+    color:white;
+    cursor:pointer;
+    text-align:center;
+}
+.card:hover{
+    border-color:#00ff99;
+}
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="upgradeMenu"></div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+let gamePaused = false;
+let wave = 1;
+
+const player = {
+    x: canvas.width/2,
+    y: canvas.height/2,
+    size:20,
+    hp:100,
+    maxHp:100,
+    speed:4,
+    damage:10,
+    fireRate:400,
+    multishot:1
+};
+
+let enemies = [];
+let bullets = [];
+let keys = {};
+
+let waveTimer = 0;
+let enemiesToSpawn = 10;
+let aliveEnemies = 0;
+
+document.addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
+document.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+
+function spawnEnemy(boss=false){
+    let side=Math.floor(Math.random()*4);
+    let x,y;
+
+    if(side===0){x=0;y=Math.random()*canvas.height;}
+    if(side===1){x=canvas.width;y=Math.random()*canvas.height;}
+    if(side===2){x=Math.random()*canvas.width;y=0;}
+    if(side===3){x=Math.random()*canvas.width;y=canvas.height;}
+
+    enemies.push({
+        x,y,
+        size: boss ? 35 : 16,
+        hp: boss ? 300 + wave*50 : 20 + wave*6,
+        maxHp: boss ? 300 + wave*50 : 20 + wave*6,
+        speed: boss ? 1.2 : 1 + wave*.05,
+        boss
+    });
+
+    aliveEnemies++;
+}
+
+function startWave(){
+    enemiesToSpawn = 8 + wave*4;
+
+    if(wave % 5 === 0){
+        spawnEnemy(true);
+    }
+
+    for(let i=0;i<enemiesToSpawn;i++){
+        spawnEnemy(false);
+    }
+}
+
+function shoot(){
+    if(gamePaused) return;
+    if(enemies.length===0) return;
+
+    let target = enemies[0];
+
+    const angle = Math.atan2(
+        target.y-player.y,
+        target.x-player.x
+    );
+
+    for(let i=0;i<player.multishot;i++){
+
+        let spread=(i-(player.multishot-1)/2)*0.15;
+
+        bullets.push({
+            x:player.x,
+            y:player.y,
+            dx:Math.cos(angle+spread)*8,
+            dy:Math.sin(angle+spread)*8,
+            damage:player.damage
+        });
+    }
+}
+
+setInterval(shoot,()=>player.fireRate);
+
+function autoFire(){
+    clearInterval(window.fireLoop);
+    window.fireLoop=setInterval(shoot,player.fireRate);
+}
+
+autoFire();
+
+function update(){
+
+    if(gamePaused) return;
+
+    if(keys["w"]) player.y-=player.speed;
+    if(keys["s"]) player.y+=player.speed;
+    if(keys["a"]) player.x-=player.speed;
+    if(keys["d"]) player.x+=player.speed;
+
+    bullets.forEach((b,bi)=>{
+
+        b.x+=b.dx;
+        b.y+=b.dy;
+
+        enemies.forEach((e,ei)=>{
+
+            const dist=Math.hypot(
+                b.x-e.x,
+                b.y-e.y
+            );
+
+            if(dist<e.size){
+
+                e.hp-=b.damage;
+                bullets.splice(bi,1);
+
+                if(e.hp<=0){
+                    enemies.splice(ei,1);
+                    aliveEnemies--;
+                }
+            }
+        });
+    });
+
+    enemies.forEach(e=>{
+
+        const angle=Math.atan2(
+            player.y-e.y,
+            player.x-e.x
+        );
+
+        e.x+=Math.cos(angle)*e.speed;
+        e.y+=Math.sin(angle)*e.speed;
+
+        const dist=Math.hypot(
+            player.x-e.x,
+            player.y-e.y
+        );
+
+        if(dist<player.size+e.size){
+            player.hp-=0.1;
+        }
+    });
+
+    if(aliveEnemies<=0){
+        wave++;
+        showUpgrade();
+    }
+}
+
+function draw(){
+
+    ctx.fillStyle="#111";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    ctx.fillStyle="#00ff99";
+    ctx.beginPath();
+    ctx.arc(player.x,player.y,player.size,0,Math.PI*2);
+    ctx.fill();
+
+    bullets.forEach(b=>{
+        ctx.fillStyle="yellow";
+        ctx.beginPath();
+        ctx.arc(b.x,b.y,4,0,Math.PI*2);
+        ctx.fill();
+    });
+
+    enemies.forEach(e=>{
+        ctx.fillStyle=e.boss ? "crimson" : "orange";
+        ctx.beginPath();
+        ctx.arc(e.x,e.y,e.size,0,Math.PI*2);
+        ctx.fill();
+
+        ctx.fillStyle="red";
+        ctx.fillRect(e.x-20,e.y-30,40,4);
+
+        ctx.fillStyle="lime";
+        ctx.fillRect(
+            e.x-20,
+            e.y-30,
+            40*(e.hp/e.maxHp),
+            4
+        );
+    });
+
+    ctx.fillStyle="white";
+    ctx.font="20px Arial";
+    ctx.fillText(
+        "Wave: "+wave,
+        20,
+        30
+    );
+
+    ctx.fillText(
+        "HP: "+Math.floor(player.hp),
+        20,
+        60
+    );
+
+    if(player.hp<=0){
+
+        ctx.fillStyle="red";
+        ctx.font="60px Arial";
+        ctx.fillText(
+            "GAME OVER",
+            canvas.width/2-180,
+            canvas.height/2
+        );
+    }
+}
+
+const upgrades = [
+
+{
+name:"Damage Up",
+desc:"+5 Damage",
+apply(){
+player.damage += 5;
+}
+},
+
+{
+name:"Fire Rate",
+desc:"Shoot Faster",
+apply(){
+player.fireRate*=0.8;
+autoFire();
+}
+},
+
+{
+name:"Health",
+desc:"+25 Max HP",
+apply(){
+player.maxHp+=25;
+player.hp+=25;
+}
+},
+
+{
+name:"Speed",
+desc:"+1 Move Speed",
+apply(){
+player.speed+=1;
+}
+},
+
+{
+name:"Multi Shot",
+desc:"+1 Projectile",
+apply(){
+player.multishot++;
+}
+}
+
+];
+
+function randomUpgrade(){
+    return upgrades[
+        Math.floor(Math.random()*upgrades.length)
+    ];
+}
+
+function showUpgrade(){
+
+    gamePaused=true;
+
+    const menu=document.getElementById("upgradeMenu");
+    menu.innerHTML="";
+    menu.style.display="flex";
+
+    for(let i=0;i<3;i++){
+
+        const up=randomUpgrade();
+
+        const card=document.createElement("div");
+        card.className="card";
+
+        card.innerHTML=
+        `<h2>${up.name}</h2>
+        <p>${up.desc}</p>`;
+
+        card.onclick=()=>{
+
+            up.apply();
+
+            menu.style.display="none";
+            gamePaused=false;
+
+            startWave();
+        };
+
+        menu.appendChild(card);
+    }
+}
+
+function gameLoop(){
+
+    update();
+    draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+startWave();
+gameLoop();
+</script>
+
+</body>
+</html>
