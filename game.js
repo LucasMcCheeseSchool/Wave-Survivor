@@ -90,32 +90,32 @@ function drawBackground(){
 
 function drawPlayer(){
 
-    const angle = Math.atan2(
-        mouse.y-player.y,
-        mouse.x-player.x
+    // body
+    ctx.fillStyle = "#5b3a1e";
+    ctx.fillRect(
+        player.x - 8,
+        player.y - 10,
+        16,
+        22
     );
 
-    ctx.save();
+    // hood
+    ctx.fillStyle = "#7a1f1f";
+    ctx.fillRect(
+        player.x - 7,
+        player.y - 18,
+        14,
+        10
+    );
 
-    ctx.translate(player.x, player.y);
-    ctx.rotate(angle);
-
-    ctx.shadowColor = "#00ff99";
-    ctx.shadowBlur = 20;
-
-    ctx.fillStyle = "#00ff99";
-
-    ctx.beginPath();
-
-    ctx.moveTo(24,0);
-    ctx.lineTo(-18,-14);
-    ctx.lineTo(-10,0);
-    ctx.lineTo(-18,14);
-
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.restore();
+    // face
+    ctx.fillStyle = "#d8c19a";
+    ctx.fillRect(
+        player.x - 4,
+        player.y - 10,
+        8,
+        8
+    );
 }
 
 function draw(){
